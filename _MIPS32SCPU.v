@@ -1,6 +1,6 @@
-module _MIPS32SCPU(R, C, Led, Switch, Hex, Rx, Tx, PC, IRQ);
-
-	input R, C;
+module _MIPS32SCPU(Rst, Clk, Led, Switch, Hex, Rx, Tx, PC, IRQ);
+//Pipeline version
+	input Rst, Clk;
 	
 	output [31:0] PC;
 	output IRQ;
@@ -29,19 +29,19 @@ module _MIPS32SCPU(R, C, Led, Switch, Hex, Rx, Tx, PC, IRQ);
 	assign IRQ=(Ovf&OvfEn)|ErrInst|TCOvf|RxRdy|TxRdy;
 	assign Exec=32'h8000_0008;
 	
-	always @(posedge C, negedge R)
+	always @(posedge Clk, negedge Rst)
+	begin
+	if(~Rst)
 		begin
-		if(~R)
-			begin
-			EPC<=32'h8000_0000;
-			Cause<=32'h0000_0000;
-			end
-		else
-			begin
-			EPC<=PC;
-			Cause<={27'b0, TxRdy, RxRdy, TCOvf, Ovf&OvfEn, ErrInst};
-			end
+		EPC<=32'h8000_0000;
+		Cause<=32'h0000_0000;
 		end
+	else
+		begin
+		EPC<=PC;
+		Cause<={27'b0, TxRdy, RxRdy, TCOvf, Ovf&OvfEn, ErrInst};
+		end
+	end
 	
 	//ALU、MEM相关
 	assign ALUA=(ALUSrc1==3'd0)?RegA:
@@ -62,8 +62,8 @@ module _MIPS32SCPU(R, C, Led, Switch, Hex, Rx, Tx, PC, IRQ);
 	_32LShift2 Shift1(EXTOut, EXTOutLS2);
 	_32AdderA Adder1(PCP4, EXTOutLS2, 1'b0, 1'b0, ConBA);
 	_32ALU ALU1(ALUA, ALUB, ALUFunc, Sign, ALUOut, Ovf);
-	_RegFile RegFile1(C, Rs, RegA, Rt, RegB, RegWr&(~IRQ), RegDstOut, RegC);
-	_RAM RAM1(R, C, ALUOut, MemRd, RAMOut, MemWr&(~IRQ), RegB, TCOvf, Led, 
+	_RegFile RegFile1(Clk, Rs, RegA, Rt, RegB, RegWr&(~IRQ), RegDstOut, RegC);
+	_RAM RAM1(Rst, Clk, ALUOut, MemRd, RAMOut, MemWr&(~IRQ), RegB, TCOvf, Led, 
 			  Switch, Hex, Rx, Tx, RxRdy, TxRdy);
 	
 	//PC相关
@@ -77,9 +77,9 @@ module _MIPS32SCPU(R, C, Led, Switch, Hex, Rx, Tx, PC, IRQ);
 	_32AdderA Adder2(PC, 32'd4, 1'b0, 1'b0, PCP4T);
 	_ROM ROM1(PC, Instruct);
 	
-	always @(posedge C, negedge R)
+	always @(posedge Clk, negedge Rst)
 		begin
-		if(~R)
+		if(~Rst)
 			begin
 			PC<=32'h8000_0000;
 			end
