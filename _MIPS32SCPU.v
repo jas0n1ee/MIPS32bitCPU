@@ -44,38 +44,39 @@ module _MIPS32SCPU(Rst, Clk, Led, Switch, Hex, Rx, Tx, PC, IRQ);
 	end
 	
 	//ALU、MEM相关
-	assign ALUA=(ALUSrc1==3'd0)?RegA:
+	assign ALUA=(ALUSrc1==3'd0)?RegA:											//MUX of ALUA
 				(ALUSrc1==3'd1)?{27'b0, Shamt[4:0]}:
 				(ALUSrc1==3'd2)?32'd16:
 				(ALUSrc1==3'd3)?EPC:
 				Cause;
-	assign ALUB=ALUSrc2?EXTOut:RegB;
-	assign EXT16=Imm16[15]?16'b1111_1111_1111_1111:16'b0;
-	assign EXTOut=EXTOp?{EXT16, Imm16}:{16'b0, Imm16};
-	assign RegDstOut=(RegDst==2'd0)?Rd:
+	assign ALUB=ALUSrc2?EXTOut:RegB;											//MUX of ALUB
+	assign EXT16=Imm16[15]?16'b1111_1111_1111_1111:16'b0;						//
+	assign EXTOut=EXTOp?{EXT16, Imm16}:{16'b0, Imm16};							//EXT
+	assign RegDstOut=(RegDst==2'd0)?Rd:											//RegDst
 					 (RegDst==2'd1)?Rt:
 					 5'd31;
-	assign RegC=(MemToReg==2'd0)?ALUOut:
+	assign RegC=(MemToReg==2'd0)?ALUOut:										//RegC
 				(MemToReg==2'd1)?RAMOut:
 				PCP4;
 	
 	_32LShift2 Shift1(EXTOut, EXTOutLS2);
-	_32AdderA Adder1(PCP4, EXTOutLS2, 1'b0, 1'b0, ConBA);
-	_32ALU ALU1(ALUA, ALUB, ALUFunc, Sign, ALUOut, Ovf);
-	_RegFile RegFile1(Clk, Rs, RegA, Rt, RegB, RegWr&(~IRQ), RegDstOut, RegC);
-	_RAM RAM1(Rst, Clk, ALUOut, MemRd, RAMOut, MemWr&(~IRQ), RegB, TCOvf, Led, 
+	_32AdderA Adder1(PCP4, EXTOutLS2, 1'b0, 1'b0, ConBA);						//calculate ConBA
+	_32ALU ALU1(ALUA, ALUB, ALUFunc, Sign, ALUOut, Ovf);						//calculate ALUOut
+	_RegFile RegFile1(Clk, Rs, RegA, Rt, RegB, RegWr&(~IRQ), RegDstOut, RegC);	//set Reg
+	_RAM RAM1(Rst, Clk, ALUOut, MemRd, RAMOut, MemWr&(~IRQ), RegB, TCOvf, Led, 	//set RAM
 			  Switch, Hex, Rx, Tx, RxRdy, TxRdy);
 	
 	//PC相关
-	assign NextPC=(PCSrc==2'd0)?PCP4:
+	
+	assign NextPC=(PCSrc==2'd0)?PCP4:				//MUX control by PCSrc OUTPUT:NextPC
 				  (PCSrc==2'd1)?ConBAOut:
 				  (PCSrc==2'd2)?{4'b0, JT, 2'b0}:
 				  RegA;
-	assign ConBAOut=ALUOut[0]?ConBA:PCP4;
-	assign PCP4={PC[31], PCP4T[30:0]};
+	assign ConBAOut=ALUOut[0]?ConBA:PCP4;			//MUX control by ALUOut[0] OUTPUT:ConBAOut
+	assign PCP4={PC[31], PCP4T[30:0]};				
 
-	_32AdderA Adder2(PC, 32'd4, 1'b0, 1'b0, PCP4T);
-	_ROM ROM1(PC, Instruct);
+	_32AdderA Adder2(PC, 32'd4, 1'b0, 1'b0, PCP4T);	//Calculate PC+4
+	_ROM ROM1(PC, Instruct);						//READ Instruct
 	
 	always @(posedge Clk, negedge Rst)
 		begin
@@ -97,9 +98,15 @@ module _MIPS32SCPU(Rst, Clk, Led, Switch, Hex, Rx, Tx, PC, IRQ);
 	assign Rt=Instruct[20:16];
 	assign Rs=Instruct[25:21];
 	
-	_Control Control1(Instruct[31:26], Instruct[5:0], 
+	_Control Control1(Instruct[31:26], Instruct[5:0], 								//Control
 					  {ALUFunc, Sign, ALUSrc1, ALUSrc2, RegWr, EXTOp, 
 					  PCSrc, RegDst, MemToReg, MemWr, MemRd, OvfEn}, ErrInst);
 	
 endmodule
+
+//TODO
+//Add lots of Regs IF/ID ID/EX EX/MEM MEM/WB
+//seperate each module by regs & test
+//Add Forward function
+
 	
