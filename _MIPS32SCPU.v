@@ -24,7 +24,10 @@ module _MIPS32SCPU(Rst, Clk, Led, Switch, Hex, Rx, Tx, PC, IRQ);
 	wire ErrInst, Ovf, TCOvf, RxRdy, TxRdy, OvfEn, IRQ;
 	
 	reg [31:0] EPC, Cause, PC;
-	
+	reg [63:0] IFID;
+	reg [:0]IDEX;
+	reg [:0]EXMEM;
+	reg [:0]MEMWB;
 	//异常和中断部分
 	assign IRQ=(Ovf&OvfEn)|ErrInst|TCOvf|RxRdy|TxRdy;
 	assign Exec=32'h8000_0008;
@@ -76,31 +79,45 @@ module _MIPS32SCPU(Rst, Clk, Led, Switch, Hex, Rx, Tx, PC, IRQ);
 	assign PCP4={PC[31], PCP4T[30:0]};				
 
 	_32AdderA Adder2(PC, 32'd4, 1'b0, 1'b0, PCP4T);	//Calculate PC+4
-	_ROM ROM1(PC, Instruct);						//READ Instruct
+	_ROM ROM1(PC, Instruct);						//READ 
 	
 	always @(posedge Clk, negedge Rst)
+	begin
+	if(~Rst)
 		begin
-		if(~Rst)
-			begin
-			PC<=32'h8000_0000;
-			end
-		else
-			begin
-			PC<=IRQ?Exec:NextPC;
-			end
+		PC<=32'h8000_0000;
 		end
+	else
+		begin
+		PC<=IRQ?Exec:NextPC;
+		end
+	end
 	
 	//译码相关
-	assign JT=Instruct[25:0];
-	assign Imm16=Instruct[15:0];
-	assign Shamt=Instruct[10:6];
-	assign Rd=Instruct[15:11];
-	assign Rt=Instruct[20:16];
-	assign Rs=Instruct[25:21];
+	assign JT=IFID[25:0];
+	assign Imm16=IFID[15:0];
+	assign Shamt=IFID[10:6];
+	assign Rd=IFID[15:11];
+	assign Rt=IFID[20:16];
+	assign Rs=IFID[25:21];
 	
-	_Control Control1(Instruct[31:26], Instruct[5:0], 								//Control
+	_Control Control1(IFID[31:26], IFID[5:0], 								//Control
 					  {ALUFunc, Sign, ALUSrc1, ALUSrc2, RegWr, EXTOp, 
 					  PCSrc, RegDst, MemToReg, MemWr, MemRd, OvfEn}, ErrInst);
+	
+	always(negedge Clk, negedge Rst)
+	begin
+		if(!Rst)
+		begin
+			IFID<=64'd0;
+			IDEX<=
+		end
+		else
+		begin
+		IFID<={PC4,Instruct};
+//		IDEX<={{ALUFunc, Sign, ALUSrc1, ALUSrc2, RegWr, EXTOp,PCSrc, RegDst, MemToReg, MemWr, MemRd, OvfEn},RegA,RegB,Rs,Rt,
+		IDEX<={{RegDst,MemToReg},{MemWr,MemRd},{ALUFunc,Sign,ALUSrc1,ALUSrc2},IFID[63:32],RegA,RegB,EXPOut,Rs,Rt,
+		
 	
 endmodule
 
